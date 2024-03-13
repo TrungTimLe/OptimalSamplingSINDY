@@ -1,0 +1,58 @@
+clear all, close all, clc
+%% Generate the data
+% Initialize parameters
+polyorder = 3;
+n = 5;
+% Initialize parameters
+mu = 5;
+c1 = 0.01;
+c2 = 10;
+F = 5;
+sigma = 10; rho = 28; beta = 8/3;
+tau_fast = 0.2;
+tau_slow = F*tau_fast;
+x0 = [2 0 -8 8 27];
+% Integrate
+dt = 0.001;
+Tmax = 20;
+tspan = [dt:dt:Tmax];
+N = length(tspan);
+par_vec = [mu,sigma,rho,beta,tau_fast,tau_slow,c1,c2];
+options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
+[t,x] = ode45(@(t,x) coupled_vdp_lorenz(t,x,par_vec),tspan,x0,options);
+
+for i = 1:size(x,2)
+    x1(:,i) = x(:,i) + 0.15*std(x(:,i))*randn(size(x,1),1);
+end
+%% alpha sensitivity for different noise level
+eta = 0:0.1:5;
+dim = 3;
+rng(1)
+for k = 1:length(eta)
+    noise_level = eta(k);
+    for i = 1:size(x,2)
+        x1(:,i) = x(:,i) + 0.15*std(x(:,i))*randn(size(x,1),1);
+    end
+    level = 5;
+    idx = (1:0.1:(level+1))-4;
+    alpha = 10.^(idx); % Regularization parameter
+    N = length(alpha);
+    TVDiff_dx = zeros(length(alpha),size(x,1)+1);
+    for i = 1:N
+        TVDiff_dx(i,:) = TVRegDiff(noisy_x(:,dim), 3, alpha(i), [], 'small', 1e-12, 0.01, 0, 0);
+        RMSE(i) = sqrt(mean((TVDiff_dx(i,1:end-1)'-ds_true(1:end,dim)).^2));
+    end
+    % Find the optimal value
+    [M,I] = min(RMSE);
+    RMSE_opt(k) = M;
+    alpha_opt(k) = alpha(I);
+end
+subplot(2,1,1)
+plot(eta,alpha_opt,'LineWidth',1.5)
+xlabel('\eta'),ylabel('Optimal \alpha')
+grid on
+
+subplot(2,1,2)
+plot(eta,RMSE_opt,'LineWidth',1.5)
+xlabel('\eta'),ylabel('Min RMSE')
+grid on
